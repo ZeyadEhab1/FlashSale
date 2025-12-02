@@ -21,7 +21,7 @@ class PaymentWebhookFactory extends Factory
     public function definition(): array
     {
         return [
-            'idempotency_key' => fake()->uuid(),
+            'transaction_reference' => fake()->uuid(),
             'order_id' => Order::factory(),
             'payload' => [
                 'payment_id' => fake()->uuid(),

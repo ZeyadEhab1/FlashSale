@@ -8,10 +8,9 @@ use App\Services\CalculateProductAvailabilityService;
 
 class ProductController extends Controller
 {
-    public function show($id, CalculateProductAvailabilityService $availabilityService)
+    public function show(Product $product, CalculateProductAvailabilityService $availabilityService)
     {
-        $product = Product::findOrFail($id);
-        $available = $availabilityService->getAvailable($product);
+        $available = $availabilityService->getAvailableProducts($product);
 
         return new ProductResource(
             $product->setAttribute('available', $available)

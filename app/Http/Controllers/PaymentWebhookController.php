@@ -13,10 +13,10 @@ class PaymentWebhookController extends Controller
         $data = $request->validated();
 
         $webhook = $service->handle([
-            'idempotency_key' => $data['idempotency_key'],
-            'order_id'        => $data['order_id'] ?? null,
-            'status'          => $data['status'],
-            'payload'         => $data['payload'] ?? $request->all(),
+            'transaction_reference' => $data['transaction_reference'],
+            'order_uuid'            => $data['order_uuid'] ?? null,
+            'status'                => $data['status'],
+            'payload'               => $data['payload'] ?? $request->all(),
         ]);
 
         return response()->json(['ok' => true]);

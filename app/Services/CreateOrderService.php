@@ -9,17 +9,16 @@ use Illuminate\Support\Facades\DB;
 
 class CreateOrderService
 {
-    // get the hold
-    // check if the hold is active
-    // if so create the order with status pending
-
-    public function createOrderFromHold(int $holdId): Order
+    public function createOrderFromHold(string $holdUuid): Order
     {
-        return DB::transaction(function () use ($holdId) {
-            $hold = Hold::where('id', $holdId)->lockForUpdate()->firstOrFail();
+        return DB::transaction(function () use ($holdUuid) {
+            $hold = Hold::where('uuid', $holdUuid)->lockForUpdate()->firstOrFail();
             if ($hold->status->value !== 'active' || $hold->expires_at->isPast()) {
                 throw new Exception("Hold is not valid", 422);
             }
+
+
+             //STEP Call the checkout process : $this->checkout($hold);
 
             $hold->status = 'used';
             $hold->save();
@@ -33,6 +32,18 @@ class CreateOrderService
 
             return $order;
         }, 5);
+    }
+
+
+    // Fake checkout method (Payment placeholder)
+    protected function checkout(Hold $hold): void
+    {
+        // Simulated payment logic:
+        // This is where you would integrate the payment gateway.
+        // Example: $paymentResponse = $this->paymentGateway->charge($hold->qty * $hold->product->price);
+        // if (!$paymentResponse->isSuccessful()) {
+        //     throw new Exception("Payment failed", 422);
+        // }
     }
 }
 

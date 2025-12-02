@@ -10,22 +10,13 @@ use Exception;
 
 class OrderController extends Controller
 {
-    public function store(CreateOrderRequest $request, CreateOrderService $orderService)
+    public function store(CreateOrderRequest $request, CreateOrderService $orderService): OrderResource
     {
         $data = $request->validated();
 
-        try {
-            $order = $orderService->createOrderFromHold($data['hold_id']);
+            $order = $orderService->createOrderFromHold($data['hold_uuid']);
             $order->load(['hold', 'product']);
 
             return new OrderResource($order);
-
-
-        }catch (Exception $e) {
-            return response()->json(
-                ['message' => $e->getMessage()],
-                $e->getCode() === 422 ? 422 : 400
-            );
-        }
     }
 }

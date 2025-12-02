@@ -10,12 +10,12 @@ class HoldResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'id'          => $this->id,
-            'product_id'  => $this->product_id,
-            'qty'         => $this->qty,
-            'status'      => $this->status->value ?? $this->status,
-            'expires_at'  => $this->expires_at?->toDateTimeString(),
-            'product' => new ProductResource($this->whenLoaded('product')),
+            'uuid'       => $this->uuid,
+            'product_id' => $this->product_id,
+            'qty'        => $this->qty,
+            'status'     => $this->status->value ?? $this->status,
+            'expires_at' => $this->expires_at?->toDateTimeString(),
+            'product'    => new ProductResource($this->whenLoaded('product')),
         ];
     }
 }

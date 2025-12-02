@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('payment_webhooks', function (Blueprint $table) {
             $table->id();
-            $table->string('idempotency_key')->unique();
+            $table->string('transaction_reference')->unique();
             $table->foreignId('order_id')->nullable()->constrained()->onDelete('set null');
             $table->json('payload')->nullable();
             $table->boolean('processed')->default(false);

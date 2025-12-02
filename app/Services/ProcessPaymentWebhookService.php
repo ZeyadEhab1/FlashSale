@@ -1,85 +1,162 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
+use App\Enums\HoldStatusEnum;
+use App\Enums\OrderStatusEnum;
 use App\Models\Order;
 use App\Models\PaymentWebhook;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProcessPaymentWebhookService
 {
-    protected $orderService;
+    private const PAYMENT_STATUS_SUCCESS = 'success';
+    private const PAYMENT_STATUS_FAILURE = 'failure';
 
-    public function __construct(CreateOrderService $orderService)
+    public function handle(array $data): PaymentWebhook
     {
-        $this->orderService = $orderService;
+        $webhook = $this->findOrCreateWebhook($data);
+
+        if ($webhook->isAlreadyProcessed()) {
+            return $webhook;
+        }
+
+        $order = $this->resolveOrder($data, $webhook);
+
+        if ($order === null) {
+            $this->logUnprocessableWebhook($webhook, 'Order not found');
+            return $webhook;
+        }
+
+        $this->processWebhookForOrder($webhook, $order, $data['status']);
+
+        return $webhook->fresh();
     }
 
 
-    public function handle(array $data)
+    private function findOrCreateWebhook(array $data): PaymentWebhook
     {
+
         try {
-            $webhook = PaymentWebhook::create([
-                'idempotency_key' => $data['idempotency_key'],
-                'order_id'        => $data['order_id'] ?? null,
-                'payload'         => $data['payload'] ?? null,
-                'processed'       => false,
+            return PaymentWebhook::create([
+                'transaction_reference' => $data['transaction_reference'],
+                'order_uuid'            => $data['order_uuid'],
+                'payload'               => $data['payload'] ?? null,
+                'processed'             => false,
             ]);
         } catch (QueryException $e) {
-            $existingWebhook = PaymentWebhook::where('idempotency_key', $data['idempotency_key'])->first();
-            if ($existingWebhook && $existingWebhook->processed) {
-                return $existingWebhook;
-            }
-            $webhook = $existingWebhook;
-        }
+            $existingWebhook = PaymentWebhook::where('transaction_reference', $data['transaction_reference'])
+                ->firstOrFail();
 
-        if ($webhook->order_id) {
-            $order = Order::where('id', $webhook->order_id)->first();
-            if ($order) {
-                $this->processWebhookAgainstOrder($webhook, $order, $data['status'] ?? null);
-            } else {
-                // order not found: leave unprocessed, will be retried by job
+            if ($existingWebhook->isAlreadyProcessed()) {
+                Log::info('Webhook already processed', [
+                    'transaction_reference' => $data['transaction_reference'],
+                ]);
             }
-        } else {
-            // webhook without order id — leave for investigation (or map via external refs)
-        }
 
-        return $webhook;
+            return $existingWebhook;
+        }
     }
 
-    private function processWebhookAgainstOrder($webhook, $order, ?string $status)
+    private function resolveOrder(array $data, PaymentWebhook $webhook): ?Order
     {
-        if ($webhook->processed) {
-            return;
+        if (!empty($data['order_uuid'])) {
+            $order = Order::where('uuid', $data['order_uuid'])->first();
+            if ($order !== null) {
+                return $order;
+            }
         }
-        DB::transaction(function () use ($webhook, $order, $status) {
-            $order = Order::where('id', $order->id)->lockForUpdate()->first();
-            if ($order->status === 'paid') {
-                $webhook->processed = true;
-                $webhook->processed_at = now();
-                $webhook->save();
+
+        if ($webhook->order_id !== null) {
+            return Order::find($webhook->order_id);
+        }
+
+        return null;
+    }
+
+
+    private function processWebhookForOrder(PaymentWebhook $webhook, Order $order, string $paymentStatus): void
+    {
+        DB::transaction(function () use ($webhook, $order, $paymentStatus) {
+            $lockedOrder = Order::where('id', $order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($this->isOrderAlreadyPaid($lockedOrder)) {
+                $this->markWebhookAsProcessed($webhook);
                 return;
             }
-            if ($status === 'success') {
-                $order->status = 'paid';
-                $order->save();
-            } else {
-                $order->status = 'cancelled';
-                $order->save();
 
-                $hold = $order->hold()->lockForUpdate()->first();
-                if ($hold && $hold->status === 'used') {
-                    $hold->status = 'cancelled';
-                    $hold->save();
-                }
-            }
-            $webhook->processed = true;
-            $webhook->processed_at = now();
-            $webhook->save();
-        });
+            $this->updateOrderStatus($lockedOrder, $paymentStatus);
+            $this->handleOrderCancellation($lockedOrder, $paymentStatus);
+            $this->markWebhookAsProcessed($webhook);
+        }, 5);
     }
 
 
-}
+    private function isOrderAlreadyPaid(Order $order): bool
+    {
+        return $order->status === OrderStatusEnum::PAID;
+    }
 
+
+    private function updateOrderStatus(Order $order, string $paymentStatus): void
+    {
+        $orderStatus = $this->mapPaymentStatusToOrderStatus($paymentStatus);
+        $order->status = $orderStatus;
+        $order->save();
+    }
+
+
+    private function mapPaymentStatusToOrderStatus(string $paymentStatus): OrderStatusEnum
+    {
+        return match ($paymentStatus) {
+            self::PAYMENT_STATUS_SUCCESS => OrderStatusEnum::PAID,
+            self::PAYMENT_STATUS_FAILURE => OrderStatusEnum::CANCELLED,
+            default                      => throw new \InvalidArgumentException("Invalid payment status: {$paymentStatus}"),
+        };
+    }
+
+
+    private function handleOrderCancellation(Order $order, string $paymentStatus): void
+    {
+        if ($paymentStatus !== self::PAYMENT_STATUS_FAILURE) {
+            return;
+        }
+
+        $hold = $order->hold()
+            ->lockForUpdate()
+            ->first();
+
+        if ($hold === null) {
+            return;
+        }
+
+        if ($hold->status === HoldStatusEnum::USED) {
+            $hold->status = HoldStatusEnum::CANCELLED;
+            $hold->save();
+        }
+    }
+
+
+    private function markWebhookAsProcessed(PaymentWebhook $webhook): void
+    {
+        $webhook->processed = true;
+        $webhook->processed_at = now();
+        $webhook->save();
+    }
+
+
+    private function logUnprocessableWebhook(PaymentWebhook $webhook, string $reason): void
+    {
+        Log::warning('Webhook cannot be processed', [
+            'webhook_id'            => $webhook->id,
+            'transaction_reference' => $webhook->transaction_reference,
+            'reason'                => $reason,
+        ]);
+    }
+}

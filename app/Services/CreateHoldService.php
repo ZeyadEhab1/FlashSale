@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 class CreateHoldService
 {
-    protected $availabilityService;
-    protected $holdTtlSeconds = 120; // 2 minutes
+    protected CalculateProductAvailabilityService $availabilityService;
+    protected int $holdTtlSeconds = 120;
 
     /**
      * @return mixed
@@ -21,19 +21,12 @@ class CreateHoldService
         $this->availabilityService = $availabilityService;
     }
 
-    public function createHold(int $productId, int $qty): Hold
+    public function createHold(string $productUuid, int $qty): Hold
     {
-        // find the product
-        // see if it is available
-        // if checks
-        // create the hold
-        $hold = DB::transaction(function () use ($productId, $qty) {
-            $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
-            $available = $this->availabilityService->getAvailable($product);
+        $hold = DB::transaction(function () use ($productUuid, $qty) {
+            $product = Product::where('uuid', $productUuid)->lockForUpdate()->firstOrFail();
+            $available = $this->availabilityService->getAvailableProducts($product);
 
-            if ($qty <= 0) {
-                throw new Exception("Quantity must be > 0");
-            }
             if ($available < $qty) {
                 throw new Exception("Not enough stock", 422);
             }

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class CalculateProductAvailabilityService
 {
-    public function getAvailable(Product $product)
+    public function getAvailableProducts(Product $product)
     {
         $activeHolds = DB::table('holds')
             ->where('product_id', $product->id)
@@ -21,14 +21,6 @@ class CalculateProductAvailabilityService
             ->sum('qty');
 
         return max(0, $product->stock - $activeHolds - $paidOrders);
-    }
-
-    public function lockProductRow(int $productId): Product
-    {
-        return DB::transaction(function () use ($productId){
-            $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
-            return $product;
-            }, 5);
     }
 }
 

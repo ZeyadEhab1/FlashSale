@@ -14,10 +14,10 @@ class PaymentWebhookRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'idempotency_key' => 'required|string',
-            'order_id'        => 'nullable|integer',
-            'status'          => 'required|string|in:success,failure',
-            'payload'         => 'nullable',
+            'transaction_reference' => 'required|string',
+            'order_uuid'            => 'nullable|string|exists:orders,uuid',
+            'status'                => 'required|string|in:success,failure',
+            'payload'               => 'nullable',
         ];
     }
 }

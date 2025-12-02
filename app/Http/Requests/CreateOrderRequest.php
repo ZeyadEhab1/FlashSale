@@ -15,7 +15,7 @@ class CreateOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'hold_id' => 'required|integer|exists:holds,id',
+            'hold_uuid' => 'required|string|exists:holds,uuid',
         ];
     }
 }

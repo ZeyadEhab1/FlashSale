@@ -6,6 +6,7 @@ use App\Enums\OrderStatusEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Order extends Model
 {
@@ -14,11 +15,26 @@ class Order extends Model
         'product_id',
         'qty',
         'status',
+        'uuid',
     ];
 
     protected $casts = [
         'status' => OrderStatusEnum::class,
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
 
     public function hold(): BelongsTo
     {

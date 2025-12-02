@@ -13,16 +13,10 @@ class HoldController extends Controller
     {
         $data = $request->validated();
 
-        try {
-            $hold = $holdService->createHold($data['product_id'], $data['qty']);
-            $hold->load('product');
-            return new HoldResource($hold);
 
-        }catch (Exception $e) {
-            return response()->json(
-                ['message' => $e->getMessage()],
-                $e->getCode() === 422 ? 422 : 400
-            );
-        }
+        $hold = $holdService->createHold($data['product_uuid'], $data['qty']);
+        $hold->load('product');
+        return new HoldResource($hold);
+
     }
 }
