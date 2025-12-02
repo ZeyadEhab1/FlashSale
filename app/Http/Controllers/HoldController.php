@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreHoldRequest;
+use App\Http\Resources\HoldResource;
+use App\Services\CreateHoldService;
+use Exception;
+
+class HoldController extends Controller
+{
+    public function store(StoreHoldRequest $request, CreateHoldService $holdService)
+    {
+        $data = $request->validated();
+
+        try {
+            $hold = $holdService->createHold($data['product_id'], $data['qty']);
+            $hold->load('product');
+            return new HoldResource($hold);
+
+        }catch (Exception $e) {
+            return response()->json(
+                ['message' => $e->getMessage()],
+                $e->getCode() === 422 ? 422 : 400
+            );
+        }
+    }
+}
