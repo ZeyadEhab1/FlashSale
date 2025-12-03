@@ -28,7 +28,7 @@ class CreateHoldService
             $available = $this->availabilityService->getAvailableProducts($product);
 
             if ($available < $qty) {
-                throw new Exception("Not enough stock", 422);
+                throw new Exception("Not enough stock");
             }
 
 

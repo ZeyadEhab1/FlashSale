@@ -14,7 +14,7 @@ class CreateOrderService
         return DB::transaction(function () use ($holdUuid) {
             $hold = Hold::where('uuid', $holdUuid)->lockForUpdate()->firstOrFail();
             if ($hold->status->value !== 'active' || $hold->expires_at->isPast()) {
-                throw new Exception("Hold is not valid", 422);
+                throw new Exception("Hold is not valid");
             }
 
 

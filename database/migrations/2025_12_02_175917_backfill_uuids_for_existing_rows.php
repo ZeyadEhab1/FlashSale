@@ -2,40 +2,39 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
-        // Backfill UUIDs for products
-        DB::table('products')->whereNull('uuid')->update([
-            'uuid' => DB::raw('UUID()')
-        ]);
+        DB::table('products')->whereNull('uuid')->get()->each(function ($row) {
+            DB::table('products')->where('id', $row->id)->update([
+                'uuid' => Str::uuid()->toString(),
+            ]);
+        });
 
-        // Backfill UUIDs for holds
-        DB::table('holds')->whereNull('uuid')->update([
-            'uuid' => DB::raw('UUID()')
-        ]);
+        DB::table('holds')->whereNull('uuid')->get()->each(function ($row) {
+            DB::table('holds')->where('id', $row->id)->update([
+                'uuid' => Str::uuid()->toString(),
+            ]);
+        });
 
-        // Backfill UUIDs for orders
-        DB::table('orders')->whereNull('uuid')->update([
-            'uuid' => DB::raw('UUID()')
-        ]);
+        DB::table('orders')->whereNull('uuid')->get()->each(function ($row) {
+            DB::table('orders')->where('id', $row->id)->update([
+                'uuid' => Str::uuid()->toString(),
+            ]);
+        });
 
-        // Backfill UUIDs for payment_webhooks
-        DB::table('payment_webhooks')->whereNull('uuid')->update([
-            'uuid' => DB::raw('UUID()')
-        ]);
+        DB::table('payment_webhooks')->whereNull('uuid')->get()->each(function ($row) {
+            DB::table('payment_webhooks')->where('id', $row->id)->update([
+                'uuid' => Str::uuid()->toString(),
+            ]);
+        });
     }
 
-    /**
-     * Reverse the migrations.
-     */
+
     public function down(): void
     {
-        // No rollback needed - UUIDs can remain
     }
 };

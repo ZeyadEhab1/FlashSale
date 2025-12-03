@@ -11,8 +11,3 @@ Route::get('/products/{product}', [ProductController::class, 'show']);
 Route::post('/holds', [HoldController::class, 'store']);
 Route::post('/orders', [OrderController::class, 'store']);
 Route::post('/payments/webhook', [PaymentWebhookController::class, 'handle']);
-
-Route::get('/test-expire', function () {
-    ExpireHoldsJob::dispatch();
-    return 'Job dispatched';
-});
